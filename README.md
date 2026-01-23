@@ -1,15 +1,14 @@
-```markdown
 # Peterson Chatbot - RAG System
 
 A Retrieval-Augmented Generation (RAG) chatbot that answers questions based on Jordan Peterson's books "12 Rules for Life" and "Maps of Meaning".
 
 ## Features
-- 🔍 Semantic search using FAISS vector database
-- 💬 Conversational AI with context memory (last 5 messages)
-- 📚 Multi-book knowledge base
-- 🎨 Clean Streamlit interface
-- 💾 Persistent vector database (no rebuild needed)
-- 🔒 Rate limiting for API calls
+- Semantic search using FAISS vector database
+- Conversational AI with context memory (last 5 messages)
+- Multi-book knowledge base
+- Clean Streamlit interface
+- Persistent vector database (no rebuild needed)
+- Rate limiting for API calls
 
 ## Setup
 
@@ -94,6 +93,38 @@ Check that your `.env` file exists and contains `OPENROUTER_API_KEY=...`
 - Subsequent runs use cached model
 - API calls may take 2-5 seconds depending on response length
 
+## Deployment
+
+### Local Deployment
+The application runs on `http://localhost:8501` by default when using Streamlit.
+
+### Production Deployment
+For production deployment, consider:
+
+1. **Streamlit Cloud**: Deploy directly from GitHub
+   - Connect your repository to Streamlit Cloud
+   - Set environment variables (OPENROUTER_API_KEY) in the dashboard
+   - Ensure `requirements.txt` is up to date
+
+2. **Docker Deployment**:
+   ```dockerfile
+   FROM python:3.9-slim
+   WORKDIR /app
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   COPY . .
+   CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+   ```
+
+3. **Environment Variables**:
+   - Set `OPENROUTER_API_KEY` in your deployment environment
+   - Ensure vector database files are accessible or rebuild on deployment
+
+### Security Considerations
+- Never commit `.env` files or API keys to version control
+- Use environment variables for sensitive configuration
+- Consider implementing authentication for production use
+- Monitor API usage and rate limits
+
 ## License
 For educational purposes only. Respects the copyright of Jordan Peterson's works.
-```
