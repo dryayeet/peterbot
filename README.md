@@ -1,6 +1,6 @@
-# Peterson Chatbot - RAG System
+# Peterson Chatbot - RAG Systemmmm
 
-A Retrieval-Augmented Generation (RAG) chatbot that answers questions based on Jordan Peterson's books "12 Rules for Life" and "Maps of Meaning".
+A Retrieval-Augmented Generation (RAG) chatbot that answers questions based on Jordan Peterson's books "12 Rules for Life" and "Maps of Meaningggg".
 
 ## Features
 - Semantic search using FAISS vector database
