@@ -30,8 +30,23 @@ class RAGSystem:
             self.embedding_model = SentenceTransformer(Config.EMBEDDING_MODEL)
             print("Embedding model loaded!")
     
-    def build_and_save_vector_db(self):
-        """Build vector database from PDFs and save to disk"""
+    def build_and_save_vector_db(self, force: bool = False):
+        """Build vector database from PDFs and save to disk
+        
+        Args:
+            force: If True, overwrite existing vector database. If False and database exists,
+                   raises ValueError to prevent accidental rebuilds.
+        
+        Raises:
+            ValueError: If vector database already exists and force=False
+        """
+        # Safety check: prevent accidental rebuilds
+        if os.path.exists(Config.FAISS_INDEX_FILE) and not force:
+            raise ValueError(
+                f"Vector database already exists at {Config.FAISS_INDEX_FILE}. "
+                "To rebuild, call with force=True: build_and_save_vector_db(force=True)"
+            )
+        
         print("Building vector database...")
         
         # Load embedding model
@@ -81,21 +96,21 @@ class RAGSystem:
         print(f"  - Saved to {Config.VECTOR_DB_PATH}")
     
     def load_vector_db(self):
-        """Load vector database from disk"""
+        """Load existing vector database from disk (does not rebuild)"""
         if not os.path.exists(Config.FAISS_INDEX_FILE):
             raise FileNotFoundError(
                 f"Vector database not found at {Config.FAISS_INDEX_FILE}. "
                 "Please run build_and_save_vector_db() first."
             )
         
-        print("Loading vector database...")
+        print("Loading existing vector database from disk...")
         self.load_embedding_model()
         self.faiss_index = faiss.read_index(Config.FAISS_INDEX_FILE)
         
         with open(Config.METADATA_FILE, 'r', encoding='utf-8') as f:
             self.metadata = json.load(f)
         
-        print(f"Loaded {len(self.metadata)} chunks from vector database")
+        print(f"Loaded {len(self.metadata)} chunks from existing vector database")
     
     def retrieve_chunks(self, query: str, top_k: int = None) -> List[Dict]:
         """Retrieve most relevant chunks for a query"""
