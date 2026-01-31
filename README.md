@@ -9,6 +9,7 @@ A Retrieval-Augmented Generation (RAG) chatbot that answers questions based on J
 - Clean Streamlit interface
 - Persistent vector database (no rebuild needed)
 - Rate limiting for API calls
+- **Separate embedding service** - Fast startup, model stays loaded
 
 ## Setup
 
@@ -33,13 +34,19 @@ Place your PDF files in the `datasets/` folder:
 - `12-Rules-for-Life.pdf`
 - `Maps-of-Meaning.pdf`
 
-### 5. Configure API Key
+### 5. Configure API Key and Embedding Service
 Create a `.env` file in the root directory:
 ```env
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Optional: Embedding service configuration
+EMBEDDING_SERVICE_URL=http://localhost:8000
+EMBEDDING_SERVICE_ENABLED=true
 ```
 
 Get your API key from: https://openrouter.ai/keys
+
+**Note:** If `EMBEDDING_SERVICE_ENABLED=false`, the app will load the model locally (slower startup but no separate service needed).
 
 ### 6. Build Vector Database (First Time Only)
 ```bash
@@ -48,12 +55,41 @@ python -c "from src.rag_system import RAGSystem; rag = RAGSystem(); rag.build_an
 
 This will process the PDFs and save the vector database to `vector_db/`.
 
-### 7. Run the App
+### 7. Start Embedding Service (Recommended)
+
+The embedding service runs separately and keeps the model loaded in memory, allowing the Streamlit app to start instantly.
+
+**Option A: Start services separately (recommended for development)**
+
+Terminal 1 - Start embedding service:
+```bash
+python embedding_service.py
+# Or use the helper script:
+python start_embedding_service.py
+```
+
+Terminal 2 - Start Streamlit app:
 ```bash
 streamlit run app.py
 ```
 
-The app will open in your browser at `http://localhost:8501`
+**Option B: Start both services together**
+
+Windows:
+```bash
+start_all.bat
+```
+
+Linux/Mac:
+```bash
+chmod +x start_all.sh
+./start_all.sh
+```
+
+The embedding service runs on `http://localhost:8000` by default.  
+The Streamlit app opens at `http://localhost:8501`
+
+**Note:** If the embedding service is not running, the app will automatically fall back to loading the model locally (slower startup).
 
 ## Usage
 
@@ -62,13 +98,43 @@ The app will open in your browser at `http://localhost:8501`
 3. **Clear Chat**: Click "Clear Chat History" to start fresh
 4. **Chat History**: Last 5 messages are maintained for context
 
+## Architecture
+
+The system uses a **microservices architecture** with separate embedding service:
+
+```
+┌─────────────────────┐
+│ Embedding Service   │  ← FastAPI server (port 8000)
+│ (Long-running)      │  ← Model loaded once, stays in memory
+│ - /encode           │
+│ - /encode_batch     │
+└──────────┬──────────┘
+           │ HTTP API
+           │
+┌──────────▼──────────┐
+│ Streamlit App       │  ← Streamlit (port 8501)
+│ (Can restart freely) │  ← Starts instantly, no model loading
+│ - RAGSystem         │
+│ - Chat interface    │
+└─────────────────────┘
+```
+
+**Benefits:**
+- Streamlit app starts instantly (no model loading delay)
+- Embedding service runs independently (survives app restarts)
+- Model loaded once, reused for all requests
+- Production-ready architecture
+
 ## Project Structure
 
+- `embedding_service.py` - FastAPI embedding service (runs separately)
 - `src/pdf_processor.py` - PDF text extraction and chunking
 - `src/rag_system.py` - Vector database and LLM integration
 - `src/config.py` - Configuration settings
 - `src/utils.py` - Helper functions
 - `app.py` - Streamlit web interface
+- `start_embedding_service.py` - Helper script to start embedding service
+- `start_all.bat` / `start_all.sh` - Scripts to start both services
 - `datasets/` - PDF storage
 - `vector_db/` - FAISS index and metadata
 
@@ -89,9 +155,15 @@ Run the build command from step 6 above.
 Check that your `.env` file exists and contains `OPENROUTER_API_KEY=...`
 
 ### Slow performance
-- First run downloads the embedding model (~80MB)
-- Subsequent runs use cached model
+- **With embedding service**: App starts instantly, model loads once in service
+- **Without embedding service**: First run downloads the embedding model (~80MB)
 - API calls may take 2-5 seconds depending on response length
+
+### "Embedding service unavailable"
+- Make sure the embedding service is running on port 8000
+- Check: `curl http://localhost:8000/health`
+- The app will automatically fall back to local model if service is unavailable
+- To disable service and use local model: Set `EMBEDDING_SERVICE_ENABLED=false` in `.env`
 
 ## Deployment
 
@@ -118,7 +190,13 @@ For production deployment, consider:
 
 3. **Environment Variables**:
    - Set `OPENROUTER_API_KEY` in your deployment environment
+   - Set `EMBEDDING_SERVICE_URL` if embedding service is on different host/port
    - Ensure vector database files are accessible or rebuild on deployment
+
+4. **Embedding Service Deployment**:
+   - Deploy embedding service separately (e.g., as a Docker container)
+   - Update `EMBEDDING_SERVICE_URL` in Streamlit app to point to deployed service
+   - Service can be scaled independently based on load
 
 ### Security Considerations
 - Never commit `.env` files or API keys to version control

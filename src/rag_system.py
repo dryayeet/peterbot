@@ -24,11 +24,55 @@ class RAGSystem:
         os.makedirs(Config.VECTOR_DB_PATH, exist_ok=True)
     
     def load_embedding_model(self):
-        """Load the sentence transformer model"""
+        """Load the sentence transformer model (fallback if service unavailable)"""
         if self.embedding_model is None:
-            print("Loading embedding model...")
+            print("Loading embedding model locally (fallback mode)...")
             self.embedding_model = SentenceTransformer(Config.EMBEDDING_MODEL)
             print("Embedding model loaded!")
+    
+    def _encode_query(self, text: str) -> np.ndarray:
+        """Encode a query using embedding service or local model as fallback"""
+        if Config.EMBEDDING_SERVICE_ENABLED:
+            try:
+                response = requests.post(
+                    f"{Config.EMBEDDING_SERVICE_URL}/encode",
+                    json={"text": text},
+                    timeout=Config.EMBEDDING_SERVICE_TIMEOUT
+                )
+                response.raise_for_status()
+                result = response.json()
+                return np.array(result["embedding"], dtype=np.float32)
+            except requests.exceptions.RequestException as e:
+                # Service enabled but failed - fallback to local
+                print(f"Warning: Embedding service unavailable ({str(e)}). Falling back to local model.")
+                self.load_embedding_model()
+                return self.embedding_model.encode([text])[0].astype(np.float32)
+        
+        # Service disabled - use local model
+        self.load_embedding_model()
+        return self.embedding_model.encode([text])[0].astype(np.float32)
+    
+    def _encode_batch(self, texts: List[str]) -> np.ndarray:
+        """Encode multiple texts using embedding service or local model as fallback"""
+        if Config.EMBEDDING_SERVICE_ENABLED:
+            try:
+                response = requests.post(
+                    f"{Config.EMBEDDING_SERVICE_URL}/encode_batch",
+                    json={"texts": texts},
+                    timeout=Config.EMBEDDING_SERVICE_TIMEOUT * 2  # Longer timeout for batch
+                )
+                response.raise_for_status()
+                result = response.json()
+                return np.array(result["embeddings"], dtype=np.float32)
+            except requests.exceptions.RequestException as e:
+                # Service enabled but failed - fallback to local
+                print(f"Warning: Embedding service unavailable ({str(e)}). Falling back to local model.")
+                self.load_embedding_model()
+                return self.embedding_model.encode(texts, show_progress_bar=True, batch_size=32).astype(np.float32)
+        
+        # Service disabled - use local model
+        self.load_embedding_model()
+        return self.embedding_model.encode(texts, show_progress_bar=True, batch_size=32).astype(np.float32)
     
     def build_and_save_vector_db(self, force: bool = False):
         """Build vector database from PDFs and save to disk
@@ -49,9 +93,6 @@ class RAGSystem:
         
         print("Building vector database...")
         
-        # Load embedding model
-        self.load_embedding_model()
-        
         # Process all PDFs
         pdf_processor = PDFProcessor()
         all_chunks = []
@@ -70,14 +111,10 @@ class RAGSystem:
         if not all_chunks:
             raise ValueError("No chunks extracted from PDFs. Check your PDF files.")
         
-        # Create embeddings
+        # Create embeddings using service or local model
         print("Creating embeddings...")
         texts = [chunk['text'] for chunk in all_chunks]
-        embeddings = self.embedding_model.encode(
-            texts,
-            show_progress_bar=True,
-            batch_size=32
-        )
+        embeddings = self._encode_batch(texts)
         
         # Build FAISS index
         print("Building FAISS index...")
@@ -104,7 +141,7 @@ class RAGSystem:
             )
         
         print("Loading existing vector database from disk...")
-        self.load_embedding_model()
+        # Don't load embedding model here - will be loaded on demand if service unavailable
         self.faiss_index = faiss.read_index(Config.FAISS_INDEX_FILE)
         
         with open(Config.METADATA_FILE, 'r', encoding='utf-8') as f:
@@ -120,10 +157,13 @@ class RAGSystem:
         if self.faiss_index is None:
             self.load_vector_db()
         
-        # Encode query
-        query_embedding = self.embedding_model.encode([query])
+        # Encode query using embedding service or local model
+        query_embedding = self._encode_query(query)
         
-        # Search in FAISS
+        # Search in FAISS (ensure query_embedding is 2D array)
+        if query_embedding.ndim == 1:
+            query_embedding = query_embedding.reshape(1, -1)
+        
         distances, indices = self.faiss_index.search(
             query_embedding.astype('float32'),
             top_k

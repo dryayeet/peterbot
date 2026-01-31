@@ -19,8 +19,13 @@ class Config:
     CHUNK_OVERLAP = 100
     TOP_K_RETRIEVAL = 4
     
+    # Embedding Service Configuration
+    EMBEDDING_SERVICE_URL = os.getenv("EMBEDDING_SERVICE_URL", "http://localhost:8000")
+    EMBEDDING_SERVICE_ENABLED = os.getenv("EMBEDDING_SERVICE_ENABLED", "true").lower() == "true"
+    EMBEDDING_SERVICE_TIMEOUT = 30  # seconds
+    
     # LLM Generation Parameters
-    MAX_TOKENS = 200
+    MAX_TOKENS = 500
     TEMPERATURE = 1.0
     TOP_P = 0.9
     
