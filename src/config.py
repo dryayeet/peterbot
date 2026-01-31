@@ -7,7 +7,7 @@ class Config:
     # API Configuration
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-    MODEL_NAME = "mistralai/mistral-large-2411"
+    MODEL_NAME = "mistralai/mistral-large-2512"
     
     # Rate Limiting
     MAX_REQUESTS_PER_MINUTE = 20
@@ -16,12 +16,12 @@ class Config:
     # RAG Configuration
     EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
     CHUNK_SIZE = 1000
-    CHUNK_OVERLAP = 200
-    TOP_K_RETRIEVAL = 3
+    CHUNK_OVERLAP = 100
+    TOP_K_RETRIEVAL = 4
     
     # LLM Generation Parameters
-    MAX_TOKENS = 400
-    TEMPERATURE = 0.7
+    MAX_TOKENS = 200
+    TEMPERATURE = 1.0
     TOP_P = 0.9
     
     # Paths
@@ -37,7 +37,7 @@ class Config:
     }
     
     # Chat Configuration
-    MAX_HISTORY_MESSAGES = 5  # Last 5 messages for context
+    MAX_HISTORY_MESSAGES = 8  # Last 5 messages for context
     
     @classmethod
     def validate(cls):
