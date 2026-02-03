@@ -25,7 +25,7 @@ class Config:
     EMBEDDING_SERVICE_TIMEOUT = 30  # seconds
     
     # LLM Generation Parameters
-    MAX_TOKENS = 500
+    MAX_TOKENS = None
     TEMPERATURE = 1.0
     TOP_P = 0.9
     
@@ -42,7 +42,7 @@ class Config:
     }
     
     # Chat Configuration
-    MAX_HISTORY_MESSAGES = 8  # Last 5 messages for context
+    MAX_HISTORY_MESSAGES = 8  
     
     @classmethod
     def validate(cls):
